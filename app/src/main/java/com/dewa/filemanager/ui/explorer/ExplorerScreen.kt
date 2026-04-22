@@ -1,5 +1,6 @@
 package com.dewa.filemanager.ui.explorer
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,7 +30,9 @@ import com.dewa.filemanager.utils.toReadableSize
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExplorerScreen(
-    onNavigateToEditor: (String) -> Unit = {}
+    onNavigateToEditor: (String) -> Unit = {},
+    onNavigateToImageViewer: (String) -> Unit = {},
+    onNavigateToVideoPlayer: (String) -> Unit = {}
 ) {
     val viewModel: ExplorerViewModel = viewModel()
     val leftPath by viewModel.leftPath.collectAsState()
@@ -38,7 +41,7 @@ fun ExplorerScreen(
     val rightFiles by viewModel.rightFiles.collectAsState()
     val storageStats by viewModel.storageStats.collectAsState()
     
-    val pagerState = rememberPagerState(pageCount = { 2 })
+    var activePane by remember { mutableIntStateOf(0) } // 0 for left, 1 for right
     var showCreateDialog by remember { mutableStateOf(false) }
     var currentCreatingPath by remember { mutableStateOf("") }
     
@@ -47,45 +50,79 @@ fun ExplorerScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showActionMenu by remember { mutableStateOf(false) }
     var showInstallDialog by remember { mutableStateOf(false) }
+    var selectedApkInfo by remember { mutableStateOf<com.dewa.filemanager.utils.ApkInfo?>(null) }
     var isLeftSourceForAction by remember { mutableStateOf(true) }
 
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
 
-    val isProcessing by viewModel.isProcessing.collectAsState()
+    val processingMessage by viewModel.processingMessage.collectAsState()
+    
+    val leftSearchQuery by viewModel.leftSearchQuery.collectAsState()
+    val rightSearchQuery by viewModel.rightSearchQuery.collectAsState()
+    var isSearchActive by remember { mutableStateOf(false) }
+
+    androidx.activity.compose.BackHandler(enabled = isSearchActive || (activePane == 0 && leftPath != "/") || (activePane == 1 && rightPath != "/")) {
+        if (isSearchActive) {
+            isSearchActive = false
+            viewModel.setLeftSearchQuery("")
+            viewModel.setRightSearchQuery("")
+        } else {
+            val path = if (activePane == 0) leftPath else rightPath
+            val parent = File(path).parent ?: "/"
+            if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+        }
+    }
 
     MTDrawer(
         drawerState = drawerState,
         storageStats = storageStats
     ) {
-        val currentPath = if (pagerState.currentPage == 0) leftPath else rightPath
-        val currentFiles = if (pagerState.currentPage == 0) leftFiles else rightFiles
+        val currentPath = if (activePane == 0) leftPath else rightPath
+        val currentFiles = if (activePane == 0) leftFiles else rightFiles
         val (folders, fileCount) = viewModel.getCounts(currentFiles)
 
         Scaffold(
+            modifier = Modifier.systemBarsPadding(),
             topBar = {
                 MTTopBar(
                     title = currentPath,
                     folderCount = folders,
                     fileCount = fileCount,
                     storageStats = storageStats,
+                    searchQuery = if (activePane == 0) leftSearchQuery else rightSearchQuery,
+                    isSearchActive = isSearchActive,
+                    onSearchQueryChange = { query ->
+                        if (activePane == 0) viewModel.setLeftSearchQuery(query) else viewModel.setRightSearchQuery(query)
+                    },
+                    onSearchToggle = { 
+                        isSearchActive = !isSearchActive 
+                        if (!isSearchActive) {
+                            viewModel.setLeftSearchQuery("")
+                            viewModel.setRightSearchQuery("")
+                        }
+                    },
                     onMenuClick = { scope.launch { drawerState.open() } },
                     onRefresh = { viewModel.refreshAll() }
                 )
             },
             bottomBar = {
                 MTBottomBar(
-                    onBack = { /* TODO */ },
+                    onBack = { 
+                        val path = if (activePane == 0) leftPath else rightPath
+                        val parent = File(path).parent ?: path
+                        if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                    },
                     onForward = { /* TODO */ },
                     onAdd = {
-                        currentCreatingPath = if (pagerState.currentPage == 0) leftPath else rightPath
+                        currentCreatingPath = if (activePane == 0) leftPath else rightPath
                         showCreateDialog = true
                     },
                     onTransfer = { /* TODO */ },
                     onUp = {
-                        val path = if (pagerState.currentPage == 0) leftPath else rightPath
+                        val path = if (activePane == 0) leftPath else rightPath
                         val parent = File(path).parent ?: path
-                        if (pagerState.currentPage == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                        if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
                     }
                 )
             }
@@ -95,21 +132,44 @@ fun ExplorerScreen(
                 Column(modifier = Modifier.padding(innerPadding)) {
                     Row(modifier = Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f)) {
-                            Column {
-                                Breadcrumb(path = leftPath, onPathClick = { viewModel.navigateLeft(it) })
+                            Column(modifier = Modifier.clickable { activePane = 0 }) {
+                                Breadcrumb(
+                                    path = leftPath,
+                                    onPathClick = { 
+                                        activePane = 0
+                                        viewModel.navigateLeft(it) 
+                                    },
+                                    isActive = activePane == 0
+                                )
                                 FilePagerList(
                                     files = leftFiles,
                                     onFileClick = { file ->
+                                        activePane = 0
                                         if (file.isDirectory) {
                                             viewModel.navigateLeft(file.path)
                                         } else if (file.name.endsWith(".apk", ignoreCase = true)) {
                                             selectedFileForAction = file
+                                            selectedApkInfo = com.dewa.filemanager.utils.ApkInfoHelper.getApkInfo(context, file.path)
                                             showInstallDialog = true
                                         } else {
-                                            FileOpener.openFile(context, file.path)
+                                            val ext = file.name.substringAfterLast('.', "").lowercase()
+                                            val editableExtensions = setOf("txt", "md", "log", "conf", "ini", "properties", "xml", "java", "kt", "kts", "js", "mjs", "ts", "html", "htm", "css", "scss", "sass", "less", "php", "py", "c", "cpp", "h", "hpp", "cs", "go", "rs", "rb", "swift", "dart", "smali", "json", "yml", "yaml", "sql", "sh", "bat")
+                                            val isImage = ext in listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
+                                            val isVideo = ext in listOf("mp4", "mkv", "avi", "webm", "mov")
+                                            
+                                            if (isImage) {
+                                                onNavigateToImageViewer(file.path)
+                                            } else if (isVideo) {
+                                                onNavigateToVideoPlayer(file.path)
+                                            } else if (ext in editableExtensions) {
+                                                onNavigateToEditor(file.path)
+                                            } else {
+                                                FileOpener.openFile(context, file.path)
+                                            }
                                         }
                                     },
                                     onFileLongClick = { file ->
+                                        activePane = 0
                                         selectedFileForAction = file
                                         isLeftSourceForAction = true
                                         showActionMenu = true
@@ -121,21 +181,44 @@ fun ExplorerScreen(
                         VerticalDivider(color = Color.Gray.copy(alpha = 0.3f))
                         
                         Box(modifier = Modifier.weight(1f)) {
-                            Column {
-                                Breadcrumb(path = rightPath, onPathClick = { viewModel.navigateRight(it) })
+                            Column(modifier = Modifier.clickable { activePane = 1 }) {
+                                Breadcrumb(
+                                    path = rightPath, 
+                                    onPathClick = { 
+                                        activePane = 1
+                                        viewModel.navigateRight(it) 
+                                    },
+                                    isActive = activePane == 1
+                                )
                                 FilePagerList(
                                     files = rightFiles,
                                     onFileClick = { file ->
+                                        activePane = 1
                                         if (file.isDirectory) {
                                             viewModel.navigateRight(file.path)
                                         } else if (file.name.endsWith(".apk", ignoreCase = true)) {
                                             selectedFileForAction = file
+                                            selectedApkInfo = com.dewa.filemanager.utils.ApkInfoHelper.getApkInfo(context, file.path)
                                             showInstallDialog = true
                                         } else {
-                                            FileOpener.openFile(context, file.path)
+                                            val ext = file.name.substringAfterLast('.', "").lowercase()
+                                            val editableExtensions = setOf("txt", "md", "log", "conf", "ini", "properties", "xml", "java", "kt", "kts", "js", "mjs", "ts", "html", "htm", "css", "scss", "sass", "less", "php", "py", "c", "cpp", "h", "hpp", "cs", "go", "rs", "rb", "swift", "dart", "smali", "json", "yml", "yaml", "sql", "sh", "bat")
+                                            val isImage = ext in listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
+                                            val isVideo = ext in listOf("mp4", "mkv", "avi", "webm", "mov")
+                                            
+                                            if (isImage) {
+                                                onNavigateToImageViewer(file.path)
+                                            } else if (isVideo) {
+                                                onNavigateToVideoPlayer(file.path)
+                                            } else if (ext in editableExtensions) {
+                                                onNavigateToEditor(file.path)
+                                            } else {
+                                                FileOpener.openFile(context, file.path)
+                                            }
                                         }
                                     },
                                     onFileLongClick = { file: FileEntity ->
+                                        activePane = 1
                                         selectedFileForAction = file
                                         isLeftSourceForAction = false
                                         showActionMenu = true
@@ -146,13 +229,22 @@ fun ExplorerScreen(
                     }
                 }
 
-                if (isProcessing) {
+                val processingMsg = processingMessage
+                if (processingMsg != null) {
                     Surface(
                         modifier = Modifier.fillMaxSize(),
                         color = Color.Black.copy(alpha = 0.5f)
                     ) {
                         Box(contentAlignment = androidx.compose.ui.Alignment.Center) {
-                            CircularProgressIndicator()
+                            Column(horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally) {
+                                CircularProgressIndicator()
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = processingMsg,
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                            }
                         }
                     }
                 }
@@ -276,14 +368,18 @@ fun ExplorerScreen(
         )
     }
 
-    if (showInstallDialog && selectedFileForAction != null) {
+    if (showInstallDialog && selectedFileForAction != null && selectedApkInfo != null) {
         val context = androidx.compose.ui.platform.LocalContext.current
-        InstallApkDialog(
-            fileName = selectedFileForAction!!.name,
-            onDismiss = { showInstallDialog = false },
+        ApkDetailDialog(
+            info = selectedApkInfo!!,
+            onDismiss = { 
+                showInstallDialog = false
+                selectedApkInfo = null
+            },
             onInstall = {
                 com.dewa.filemanager.utils.ApkInstaller.install(context, selectedFileForAction!!.path)
                 showInstallDialog = false
+                selectedApkInfo = null
             }
         )
     }
@@ -296,6 +392,10 @@ fun MTTopBar(
     folderCount: Int, 
     fileCount: Int, 
     storageStats: FileManagerRepository.StorageStats?,
+    searchQuery: String,
+    isSearchActive: Boolean,
+    onSearchQueryChange: (String) -> Unit,
+    onSearchToggle: () -> Unit,
     onMenuClick: () -> Unit, 
     onRefresh: () -> Unit
 ) {
@@ -303,12 +403,30 @@ fun MTTopBar(
         Column {
             TopAppBar(
                 title = { 
-                    Text(
-                        title, 
-                        style = MaterialTheme.typography.labelMedium, 
-                        maxLines = 1, 
-                        overflow = TextOverflow.Ellipsis
-                    ) 
+                    if (isSearchActive) {
+                        TextField(
+                            value = searchQuery,
+                            onValueChange = onSearchQueryChange,
+                            placeholder = { Text("Search files...", fontSize = 14.sp) },
+                            modifier = Modifier.fillMaxWidth().height(48.dp),
+                            colors = TextFieldDefaults.colors(
+                                focusedContainerColor = Color.Transparent,
+                                unfocusedContainerColor = Color.Transparent,
+                                disabledContainerColor = Color.Transparent,
+                                focusedIndicatorColor = Color.Transparent,
+                                unfocusedIndicatorColor = Color.Transparent,
+                            ),
+                            singleLine = true,
+                            textStyle = TextStyle(fontSize = 14.sp, color = MaterialTheme.colorScheme.onSurface)
+                        )
+                    } else {
+                        Text(
+                            title, 
+                            style = MaterialTheme.typography.labelMedium, 
+                            maxLines = 1, 
+                            overflow = TextOverflow.Ellipsis
+                        ) 
+                    }
                 },
                 navigationIcon = {
                     IconButton(onClick = onMenuClick, modifier = Modifier.size(32.dp)) {
@@ -316,6 +434,13 @@ fun MTTopBar(
                     }
                 },
                 actions = {
+                    IconButton(onClick = onSearchToggle, modifier = Modifier.size(32.dp)) {
+                        Icon(
+                            if (isSearchActive) Icons.Default.Close else Icons.Default.Search, 
+                            contentDescription = null, 
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
                     IconButton(onClick = onRefresh, modifier = Modifier.size(32.dp)) {
                         Icon(Icons.Default.Refresh, contentDescription = null, modifier = Modifier.size(20.dp))
                     }

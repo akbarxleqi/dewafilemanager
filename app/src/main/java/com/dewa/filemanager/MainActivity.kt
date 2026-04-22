@@ -20,40 +20,81 @@ import com.dewa.filemanager.ui.explorer.ExplorerScreen
 import com.dewa.filemanager.ui.theme.DewaManagerTheme
 import com.dewa.filemanager.utils.PermissionManager
 
+enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO }
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             DewaManagerTheme {
-                var hasPermission by remember { mutableStateOf(PermissionManager.hasAllFilesAccess()) }
+                Surface(
+                    modifier = Modifier.fillMaxSize(),
+                    color = MaterialTheme.colorScheme.background
+                ) {
+                    var hasPermission by remember { mutableStateOf(PermissionManager.hasAllFilesAccess()) }
 
-                // Simple check for permission updates when returning to the app
-                LaunchedEffect(Unit) {
-                    // In a real app, you might use a LifecycleObserver
-                }
-
-                if (hasPermission) {
-                    var currentPathForEditor by remember { mutableStateOf<String?>(null) }
-
-                    if (currentPathForEditor == null) {
-                        ExplorerScreen(
-                            onNavigateToEditor = { path ->
-                                currentPathForEditor = path
-                            }
-                        )
-                    } else {
-                        com.dewa.filemanager.ui.editor.EditorScreen(
-                            filePath = currentPathForEditor!!,
-                            onBack = { currentPathForEditor = null }
-                        )
+                    // Simple check for permission updates when returning to the app
+                    LaunchedEffect(Unit) {
+                        // In a real app, you might use a LifecycleObserver
                     }
-                } else {
-                    PermissionRequestScreen {
-                        PermissionManager.requestAllFilesAccess(this)
-                        // Note: User has to come back and we check again. 
-                        // For simplicity, we just assume they might have granted it.
-                        // In a real app, check in onResume.
+
+                    if (hasPermission) {
+                        var currentViewer by remember { mutableStateOf(ViewerType.NONE) }
+                        var currentPathForViewer by remember { mutableStateOf<String?>(null) }
+
+                        when (currentViewer) {
+                            ViewerType.NONE -> {
+                                ExplorerScreen(
+                                    onNavigateToEditor = { path ->
+                                        currentPathForViewer = path
+                                        currentViewer = ViewerType.EDITOR
+                                    },
+                                    onNavigateToImageViewer = { path ->
+                                        currentPathForViewer = path
+                                        currentViewer = ViewerType.IMAGE
+                                    },
+                                    onNavigateToVideoPlayer = { path ->
+                                        currentPathForViewer = path
+                                        currentViewer = ViewerType.VIDEO
+                                    }
+                                )
+                            }
+                            ViewerType.EDITOR -> {
+                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                currentPathForViewer?.let { path ->
+                                    com.dewa.filemanager.ui.editor.EditorScreen(
+                                        filePath = path,
+                                        onBack = { currentViewer = ViewerType.NONE }
+                                    )
+                                }
+                            }
+                            ViewerType.IMAGE -> {
+                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                currentPathForViewer?.let { path ->
+                                    com.dewa.filemanager.ui.viewer.ImageViewerScreen(
+                                        filePath = path,
+                                        onBack = { currentViewer = ViewerType.NONE }
+                                    )
+                                }
+                            }
+                            ViewerType.VIDEO -> {
+                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                currentPathForViewer?.let { path ->
+                                    com.dewa.filemanager.ui.viewer.VideoPlayerScreen(
+                                        filePath = path,
+                                        onBack = { currentViewer = ViewerType.NONE }
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        PermissionRequestScreen {
+                            PermissionManager.requestAllFilesAccess(this@MainActivity)
+                            // Note: User has to come back and we check again. 
+                            // For simplicity, we just assume they might have granted it.
+                            // In a real app, check in onResume.
+                        }
                     }
                 }
             }

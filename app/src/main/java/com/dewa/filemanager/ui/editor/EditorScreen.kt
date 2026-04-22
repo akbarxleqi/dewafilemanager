@@ -16,8 +16,11 @@ import androidx.compose.ui.text.input.TransformedText
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.dewa.filemanager.utils.SyntaxHighlighter
+import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.geometry.Offset
 import kotlinx.coroutines.launch
+import com.dewa.filemanager.utils.SyntaxHighlighter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -66,15 +69,22 @@ fun EditorScreen(
                 .fillMaxSize(),
             color = MaterialTheme.colorScheme.background
         ) {
+            var scale by remember { mutableFloatStateOf(1f) }
+
             BasicTextField(
                 value = content,
                 onValueChange = { viewModel.updateContent(it) },
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(16.dp),
+                    .padding(16.dp)
+                    .pointerInput(Unit) {
+                        detectTransformGestures { _, _, zoom, _ ->
+                            scale = (scale * zoom).coerceIn(0.5f, 5f)
+                        }
+                    },
                 textStyle = TextStyle(
                     fontFamily = FontFamily.Monospace,
-                    fontSize = 14.sp,
+                    fontSize = (14 * scale).sp,
                     color = MaterialTheme.colorScheme.onBackground
                 ),
                 cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),

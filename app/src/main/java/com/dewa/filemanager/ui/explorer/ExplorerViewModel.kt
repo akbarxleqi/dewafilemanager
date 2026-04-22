@@ -14,8 +14,8 @@ class ExplorerViewModel(
     private val repository: FileManagerRepository = FileManagerRepository()
 ) : ViewModel() {
 
-    private val _isProcessing = MutableStateFlow(false)
-    val isProcessing: StateFlow<Boolean> = _isProcessing
+    private val _processingMessage = MutableStateFlow<String?>(null)
+    val processingMessage: StateFlow<String?> = _processingMessage
 
     private val _leftPath = MutableStateFlow(repository.getRootPath())
     val leftPath: StateFlow<String> = _leftPath
@@ -32,8 +32,24 @@ class ExplorerViewModel(
     private val _storageStats = MutableStateFlow<FileManagerRepository.StorageStats?>(null)
     val storageStats: StateFlow<FileManagerRepository.StorageStats?> = _storageStats
 
+    private val _leftSearchQuery = MutableStateFlow("")
+    val leftSearchQuery: StateFlow<String> = _leftSearchQuery
+
+    private val _rightSearchQuery = MutableStateFlow("")
+    val rightSearchQuery: StateFlow<String> = _rightSearchQuery
+
     init {
         refreshAll()
+    }
+
+    fun setLeftSearchQuery(query: String) {
+        _leftSearchQuery.value = query
+        refreshLeft()
+    }
+
+    fun setRightSearchQuery(query: String) {
+        _rightSearchQuery.value = query
+        refreshRight()
     }
 
     fun refreshAll() {
@@ -44,23 +60,35 @@ class ExplorerViewModel(
 
     fun navigateLeft(newPath: String) {
         _leftPath.value = newPath
+        _leftSearchQuery.value = "" // Clear search on navigation
         refreshLeft()
     }
 
     fun navigateRight(newPath: String) {
         _rightPath.value = newPath
+        _rightSearchQuery.value = "" // Clear search on navigation
         refreshRight()
     }
 
     private fun refreshLeft() {
         viewModelScope.launch {
-            _leftFiles.value = repository.listFiles(_leftPath.value)
+            val allFiles = repository.listFiles(_leftPath.value)
+            _leftFiles.value = if (_leftSearchQuery.value.isEmpty()) {
+                allFiles
+            } else {
+                allFiles.filter { it.name.contains(_leftSearchQuery.value, ignoreCase = true) }
+            }
         }
     }
 
     private fun refreshRight() {
         viewModelScope.launch {
-            _rightFiles.value = repository.listFiles(_rightPath.value)
+            val allFiles = repository.listFiles(_rightPath.value)
+            _rightFiles.value = if (_rightSearchQuery.value.isEmpty()) {
+                allFiles
+            } else {
+                allFiles.filter { it.name.contains(_rightSearchQuery.value, ignoreCase = true) }
+            }
         }
     }
 
@@ -92,29 +120,35 @@ class ExplorerViewModel(
 
     fun transferFile(srcPath: String, destPath: String, isMove: Boolean) {
         viewModelScope.launch {
-            _isProcessing.value = true
-            val success = if (isMove) repository.moveItem(srcPath, destPath) else repository.copyItem(srcPath, destPath)
+            _processingMessage.value = if (isMove) "Memindahkan file..." else "Menyalin file..."
+            val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                if (isMove) repository.moveItem(srcPath, destPath) else repository.copyItem(srcPath, destPath)
+            }
             if (success) refreshAll()
-            _isProcessing.value = false
+            _processingMessage.value = null
         }
     }
 
     fun extractZip(zipPath: String, destPath: String) {
         viewModelScope.launch {
-            _isProcessing.value = true
-            val success = ArchiveRepository.extractZip(zipPath, destPath)
+            _processingMessage.value = "Mengekstrak file ZIP..."
+            val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ArchiveRepository.extractZip(zipPath, destPath)
+            }
             if (success) refreshAll()
-            _isProcessing.value = false
+            _processingMessage.value = null
         }
     }
 
     fun compressToZip(srcPath: String) {
         viewModelScope.launch {
-            _isProcessing.value = true
+            _processingMessage.value = "Mengkompres ke ZIP..."
             val zipPath = if (srcPath.endsWith("/")) srcPath.dropLast(1) + ".zip" else "$srcPath.zip"
-            val success = ArchiveRepository.compressToZip(srcPath, zipPath)
+            val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                ArchiveRepository.compressToZip(srcPath, zipPath)
+            }
             if (success) refreshAll()
-            _isProcessing.value = false
+            _processingMessage.value = null
         }
     }
 

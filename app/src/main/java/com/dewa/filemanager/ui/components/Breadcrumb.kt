@@ -1,5 +1,6 @@
 package com.dewa.filemanager.ui.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -16,7 +17,8 @@ import com.dewa.filemanager.ui.theme.MTOnSurface
 fun Breadcrumb(
     path: String,
     onPathClick: (String) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isActive: Boolean = false
 ) {
     val scrollState = rememberScrollState()
     val parts = path.split("/").filter { it.isNotEmpty() }
@@ -25,6 +27,7 @@ fun Breadcrumb(
         modifier = modifier
             .fillMaxWidth()
             .horizontalScroll(scrollState)
+            .background(if (isActive) Color.Gray.copy(alpha = 0.15f) else Color.Transparent)
             .padding(horizontal = 8.dp, vertical = 2.dp)
     ) {
         // Root icon or "/"
