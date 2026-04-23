@@ -12,9 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.dewa.filemanager.ui.theme.MTOnSurface
 import com.dewa.filemanager.ui.theme.MTPrimary
-import com.dewa.filemanager.ui.theme.MTTextSecondary
 import com.dewa.filemanager.utils.toReadableSize
 
 @Composable
@@ -41,7 +39,7 @@ fun StorageCard(
                 Icon(
                     imageVector = icon,
                     contentDescription = null,
-                    tint = MTOnSurface,
+                    tint = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.size(24.dp)
                 )
             }
@@ -50,11 +48,11 @@ fun StorageCard(
         Spacer(modifier = Modifier.width(16.dp))
         
         val progress = if (totalBytes > 0) usedBytes.toFloat() / totalBytes.toFloat() else 0f
-
+ 
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = MTOnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 16.sp
             )
             
@@ -69,7 +67,7 @@ fun StorageCard(
             
             Text(
                 text = "${usedBytes.toReadableSize()} digunakan, ${availableBytes.toReadableSize()} tersedia",
-                color = MTTextSecondary,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                 fontSize = 12.sp
             )
         }

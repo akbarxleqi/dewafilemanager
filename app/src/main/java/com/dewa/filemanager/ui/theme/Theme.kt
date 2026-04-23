@@ -27,14 +27,14 @@ private val MTDarkColorScheme = darkColorScheme(
 private val MTLightColorScheme = lightColorScheme(
     primary = MTPrimary,
     onPrimary = MTOnBackground,
-    secondary = MTSurface,
-    onSecondary = MTOnSurface,
-    background = MTBackground,
-    onBackground = MTOnBackground,
-    surface = MTSurface,
-    onSurface = MTOnSurface,
+    secondary = MTSurfaceLight,
+    onSecondary = MTOnSurfaceLight,
+    background = MTBackgroundLight,
+    onBackground = MTOnBackgroundLight,
+    surface = MTSurfaceLight,
+    onSurface = MTOnSurfaceLight,
     error = MTError,
-    onError = MTOnBackground
+    onError = MTOnBackgroundLight
 )
 
 @Composable

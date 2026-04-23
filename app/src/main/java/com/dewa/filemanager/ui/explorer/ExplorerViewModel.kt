@@ -38,7 +38,14 @@ class ExplorerViewModel(
     private val _rightSearchQuery = MutableStateFlow("")
     val rightSearchQuery: StateFlow<String> = _rightSearchQuery
 
+    private val _leftArchiveState = MutableStateFlow<ArchivePaneState?>(null)
+    val leftArchiveState: StateFlow<ArchivePaneState?> = _leftArchiveState
+
+    private val _rightArchiveState = MutableStateFlow<ArchivePaneState?>(null)
+    val rightArchiveState: StateFlow<ArchivePaneState?> = _rightArchiveState
+
     init {
+        repository.ensureAppDirectories()
         refreshAll()
     }
 
@@ -59,15 +66,74 @@ class ExplorerViewModel(
     }
 
     fun navigateLeft(newPath: String) {
+        _leftArchiveState.value = null
         _leftPath.value = newPath
         _leftSearchQuery.value = "" // Clear search on navigation
         refreshLeft()
     }
 
     fun navigateRight(newPath: String) {
+        _rightArchiveState.value = null
         _rightPath.value = newPath
         _rightSearchQuery.value = "" // Clear search on navigation
         refreshRight()
+    }
+
+    fun resetPanelsToRoot() {
+        val root = repository.getRootPath()
+        _leftArchiveState.value = null
+        _rightArchiveState.value = null
+        _leftPath.value = root
+        _rightPath.value = root
+        _leftSearchQuery.value = ""
+        _rightSearchQuery.value = ""
+        refreshAll()
+    }
+
+    fun openRecycleBin(isLeftPane: Boolean) {
+        repository.ensureAppDirectories()
+        val recyclePath = repository.getRecyclePath()
+        if (isLeftPane) {
+            _leftArchiveState.value = null
+            _leftPath.value = recyclePath
+            _leftSearchQuery.value = ""
+            refreshLeft()
+        } else {
+            _rightArchiveState.value = null
+            _rightPath.value = recyclePath
+            _rightSearchQuery.value = ""
+            refreshRight()
+        }
+    }
+
+    fun setArchiveState(isLeftPane: Boolean, state: ArchivePaneState?) {
+        if (isLeftPane) _leftArchiveState.value = state else _rightArchiveState.value = state
+    }
+
+    fun getArchiveState(isLeftPane: Boolean): ArchivePaneState? {
+        return if (isLeftPane) _leftArchiveState.value else _rightArchiveState.value
+    }
+
+    fun setArchivePath(isLeftPane: Boolean, path: String) {
+        val state = getArchiveState(isLeftPane) ?: return
+        val updatedTop = state.top.copy(currentPath = path)
+        val updatedState = state.copy(layers = state.layers.dropLast(1) + updatedTop)
+        setArchiveState(isLeftPane, updatedState)
+    }
+
+    fun navigateArchiveUp(isLeftPane: Boolean): Boolean {
+        val state = getArchiveState(isLeftPane) ?: return false
+        val top = state.top
+        return if (top.currentPath.isNotBlank()) {
+            setArchivePath(isLeftPane, archiveParentPath(top.currentPath))
+            true
+        } else if (state.layers.size > 1) {
+            setArchiveState(isLeftPane, state.copy(layers = state.layers.dropLast(1)))
+            true
+        } else {
+            setArchiveState(isLeftPane, null)
+            true
+        }
     }
 
     private fun refreshLeft() {
@@ -140,12 +206,12 @@ class ExplorerViewModel(
         }
     }
 
-    fun compressToZip(srcPath: String) {
+    fun compressToZip(srcPath: String, password: String? = null) {
         viewModelScope.launch {
             _processingMessage.value = "Mengkompres ke ZIP..."
             val zipPath = if (srcPath.endsWith("/")) srcPath.dropLast(1) + ".zip" else "$srcPath.zip"
             val success = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
-                ArchiveRepository.compressToZip(srcPath, zipPath)
+                ArchiveRepository.compressToZip(srcPath, zipPath, password)
             }
             if (success) refreshAll()
             _processingMessage.value = null

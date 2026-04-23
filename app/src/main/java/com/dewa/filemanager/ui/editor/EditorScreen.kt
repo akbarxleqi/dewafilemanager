@@ -26,6 +26,7 @@ import com.dewa.filemanager.utils.SyntaxHighlighter
 @Composable
 fun EditorScreen(
     filePath: String,
+    onSaveOverride: (suspend (String) -> Boolean?)? = null,
     onBack: () -> Unit
 ) {
     val viewModel: EditorViewModel = viewModel()
@@ -51,7 +52,7 @@ fun EditorScreen(
                 actions = {
                     IconButton(onClick = {
                         scope.launch {
-                            val success = viewModel.saveFile()
+                            val success = onSaveOverride?.invoke(content) ?: viewModel.saveFile()
                             snackbarHostState.showSnackbar(
                                 if (success) "File disimpan" else "Gagal menyimpan file"
                             )

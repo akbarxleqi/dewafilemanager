@@ -51,6 +51,8 @@ dependencies {
     implementation(libs.androidx.compose.material3)
     implementation(libs.androidx.navigation.compose)
     implementation(libs.androidx.compose.material.icons.extended)
+    implementation(libs.zip4j)
+    implementation(libs.junrar)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

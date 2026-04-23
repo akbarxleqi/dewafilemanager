@@ -9,6 +9,13 @@ val MTPrimary = Color(0xFF2196F3)
 val MTOnBackground = Color(0xFFFFFFFF)
 val MTOnSurface = Color(0xFFE0E0E0)
 val MTTextSecondary = Color(0xFFB0B0B0)
+
+// MT Light Style Colors
+val MTBackgroundLight = Color(0xFFF5F5F5)
+val MTSurfaceLight = Color(0xFFFFFFFF)
+val MTOnBackgroundLight = Color(0xFF000000)
+val MTOnSurfaceLight = Color(0xFF212121)
+
 val MTAccent = Color(0xFF4CAF50) // Green for some highlights
 val MTError = Color(0xFFF44336)
 

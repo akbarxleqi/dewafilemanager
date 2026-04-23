@@ -9,6 +9,9 @@ import java.io.File
 
 class FileManagerRepository {
 
+    private val appFolderName = "D-Manager"
+    private val recycleFolderName = "recycle"
+
     suspend fun listFiles(path: String): List<FileEntity> = withContext(Dispatchers.IO) {
         val directory = File(path)
         if (!directory.exists() || !directory.isDirectory) return@withContext emptyList<FileEntity>()
@@ -33,12 +36,49 @@ class FileManagerRepository {
 
     fun getRootPath(): String = Environment.getExternalStorageDirectory().absolutePath
 
+    fun getManagerRootPath(): String = File(getRootPath(), appFolderName).absolutePath
+
+    fun getRecyclePath(): String = File(getManagerRootPath(), recycleFolderName).absolutePath
+
+    fun ensureAppDirectories() {
+        val managerDir = File(getManagerRootPath())
+        if (!managerDir.exists()) managerDir.mkdirs()
+
+        val recycleDir = File(getRecyclePath())
+        if (!recycleDir.exists()) recycleDir.mkdirs()
+    }
+
     fun deleteItem(path: String): Boolean {
         val file = File(path)
-        return if (file.isDirectory) {
-            file.deleteRecursively()
-        } else {
-            file.delete()
+        if (!file.exists()) return false
+
+        ensureAppDirectories()
+        val recycleDir = File(getRecyclePath())
+        val recyclePath = recycleDir.absolutePath
+
+        // Items inside recycle are deleted permanently.
+        if (file.absolutePath.startsWith(recyclePath)) {
+            return if (file.isDirectory) file.deleteRecursively() else file.delete()
+        }
+
+        var target = File(recycleDir, file.name)
+        if (target.exists()) {
+            val name = file.nameWithoutExtension
+            val ext = file.extension
+            val suffix = System.currentTimeMillis()
+            val candidateName = if (ext.isBlank()) "${name}_$suffix" else "${name}_$suffix.$ext"
+            target = File(recycleDir, candidateName)
+        }
+
+        return try {
+            if (file.renameTo(target)) {
+                true
+            } else {
+                file.copyRecursively(target, overwrite = true)
+                if (file.isDirectory) file.deleteRecursively() else file.delete()
+            }
+        } catch (e: Exception) {
+            false
         }
     }
 

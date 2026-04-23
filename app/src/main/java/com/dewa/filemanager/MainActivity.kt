@@ -2,6 +2,7 @@ package com.dewa.filemanager
 
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.layout.Arrangement
@@ -13,64 +14,94 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.dewa.filemanager.ui.explorer.ExplorerScreen
 import com.dewa.filemanager.ui.theme.DewaManagerTheme
 import com.dewa.filemanager.utils.PermissionManager
+import com.dewa.filemanager.ui.editor.ArchiveEditTarget
+import com.dewa.filemanager.data.repository.ArchiveRepository
 
-enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO }
+enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE }
 
 class MainActivity : ComponentActivity() {
+    private val hasPermissionState = mutableStateOf(false)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        hasPermissionState.value = PermissionManager.hasAllFilesAccess()
         enableEdgeToEdge()
         setContent {
-            DewaManagerTheme {
+            var isDarkMode by remember { mutableStateOf(true) }
+            val hasPermission by hasPermissionState
+            
+            DewaManagerTheme(darkTheme = isDarkMode) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    var hasPermission by remember { mutableStateOf(PermissionManager.hasAllFilesAccess()) }
-
-                    // Simple check for permission updates when returning to the app
-                    LaunchedEffect(Unit) {
-                        // In a real app, you might use a LifecycleObserver
-                    }
-
                     if (hasPermission) {
                         var currentViewer by remember { mutableStateOf(ViewerType.NONE) }
                         var currentPathForViewer by remember { mutableStateOf<String?>(null) }
+                        var currentArchiveEditTarget by remember { mutableStateOf<ArchiveEditTarget?>(null) }
 
                         when (currentViewer) {
                             ViewerType.NONE -> {
                                 ExplorerScreen(
-                                    onNavigateToEditor = { path ->
+                                    isDarkMode = isDarkMode,
+                                    onThemeToggle = { isDarkMode = !isDarkMode },
+                                    onNavigateToEditor = { path, archiveTarget ->
                                         currentPathForViewer = path
+                                        currentArchiveEditTarget = archiveTarget
                                         currentViewer = ViewerType.EDITOR
                                     },
                                     onNavigateToImageViewer = { path ->
                                         currentPathForViewer = path
+                                        currentArchiveEditTarget = null
                                         currentViewer = ViewerType.IMAGE
                                     },
                                     onNavigateToVideoPlayer = { path ->
                                         currentPathForViewer = path
+                                        currentArchiveEditTarget = null
                                         currentViewer = ViewerType.VIDEO
+                                    },
+                                    onNavigateToArchive = { path ->
+                                        currentPathForViewer = path
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.ARCHIVE
                                     }
                                 )
                             }
                             ViewerType.EDITOR -> {
-                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                BackHandler { currentViewer = ViewerType.NONE }
                                 currentPathForViewer?.let { path ->
                                     com.dewa.filemanager.ui.editor.EditorScreen(
                                         filePath = path,
-                                        onBack = { currentViewer = ViewerType.NONE }
+                                        onSaveOverride = { content ->
+                                            val target = currentArchiveEditTarget
+                                            if (target == null) {
+                                                null
+                                            } else {
+                                                ArchiveRepository.replaceArchiveTextEntry(
+                                                    archivePath = target.archivePath,
+                                                    entryPath = target.entryPath,
+                                                    content = content,
+                                                    password = target.password
+                                                )
+                                            }
+                                        },
+                                        onBack = {
+                                            currentArchiveEditTarget = null
+                                            currentViewer = ViewerType.NONE
+                                        }
                                     )
                                 }
                             }
                             ViewerType.IMAGE -> {
-                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                BackHandler { currentViewer = ViewerType.NONE }
                                 currentPathForViewer?.let { path ->
                                     com.dewa.filemanager.ui.viewer.ImageViewerScreen(
                                         filePath = path,
@@ -79,9 +110,18 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                             ViewerType.VIDEO -> {
-                                androidx.activity.compose.BackHandler { currentViewer = ViewerType.NONE }
+                                BackHandler { currentViewer = ViewerType.NONE }
                                 currentPathForViewer?.let { path ->
                                     com.dewa.filemanager.ui.viewer.VideoPlayerScreen(
+                                        filePath = path,
+                                        onBack = { currentViewer = ViewerType.NONE }
+                                    )
+                                }
+                            }
+                            ViewerType.ARCHIVE -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                currentPathForViewer?.let { path ->
+                                    com.dewa.filemanager.ui.viewer.ArchiveViewerScreen(
                                         filePath = path,
                                         onBack = { currentViewer = ViewerType.NONE }
                                     )
@@ -91,19 +131,16 @@ class MainActivity : ComponentActivity() {
                     } else {
                         PermissionRequestScreen {
                             PermissionManager.requestAllFilesAccess(this@MainActivity)
-                            // Note: User has to come back and we check again. 
-                            // For simplicity, we just assume they might have granted it.
-                            // In a real app, check in onResume.
                         }
                     }
                 }
             }
         }
     }
-    
+
     override fun onResume() {
         super.onResume()
-        // Force recomposition or state update would be better, but for now we skip complex logic
+        hasPermissionState.value = PermissionManager.hasAllFilesAccess()
     }
 }
 

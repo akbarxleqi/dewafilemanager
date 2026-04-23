@@ -19,8 +19,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dewa.filemanager.data.model.FileEntity
-import com.dewa.filemanager.ui.theme.MTOnSurface
-import com.dewa.filemanager.ui.theme.MTTextSecondary
 import com.dewa.filemanager.utils.toReadableDate
 import com.dewa.filemanager.utils.toReadableSize
 
@@ -113,21 +111,21 @@ fun FileRow(
         Column {
             Text(
                 text = file.name,
-                color = MTOnSurface,
+                color = MaterialTheme.colorScheme.onSurface,
                 fontSize = 13.sp,
                 maxLines = 1
             )
             Row {
                 Text(
                     text = file.lastModified.toReadableDate(),
-                    color = MTTextSecondary,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                     fontSize = 10.sp
                 )
                 if (!file.isDirectory) {
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
                         text = file.size.toReadableSize(),
-                        color = MTTextSecondary,
+                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         fontSize = 10.sp
                     )
                 }

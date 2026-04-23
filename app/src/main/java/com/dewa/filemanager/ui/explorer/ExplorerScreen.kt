@@ -4,21 +4,19 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.dewa.filemanager.data.model.FileEntity
+import com.dewa.filemanager.data.repository.ArchiveRepository
 import com.dewa.filemanager.data.repository.FileManagerRepository
 import com.dewa.filemanager.ui.components.*
-import com.dewa.filemanager.ui.theme.MTBackground
-import com.dewa.filemanager.ui.theme.MTOnSurface
 import kotlinx.coroutines.launch
 import java.io.File
 import androidx.compose.ui.text.style.TextOverflow
@@ -26,13 +24,19 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.sp
 import com.dewa.filemanager.utils.FileOpener
 import com.dewa.filemanager.utils.toReadableSize
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ExplorerScreen(
-    onNavigateToEditor: (String) -> Unit = {},
+    isDarkMode: Boolean = true,
+    onThemeToggle: () -> Unit = {},
+    onNavigateToEditor: (String, com.dewa.filemanager.ui.editor.ArchiveEditTarget?) -> Unit = { _, _ -> },
     onNavigateToImageViewer: (String) -> Unit = {},
-    onNavigateToVideoPlayer: (String) -> Unit = {}
+    onNavigateToVideoPlayer: (String) -> Unit = {},
+    onNavigateToArchive: (String) -> Unit = {}
 ) {
     val viewModel: ExplorerViewModel = viewModel()
     val leftPath by viewModel.leftPath.collectAsState()
@@ -40,6 +44,8 @@ fun ExplorerScreen(
     val leftFiles by viewModel.leftFiles.collectAsState()
     val rightFiles by viewModel.rightFiles.collectAsState()
     val storageStats by viewModel.storageStats.collectAsState()
+    val leftArchiveState by viewModel.leftArchiveState.collectAsState()
+    val rightArchiveState by viewModel.rightArchiveState.collectAsState()
     
     var activePane by remember { mutableIntStateOf(0) } // 0 for left, 1 for right
     var showCreateDialog by remember { mutableStateOf(false) }
@@ -50,11 +56,16 @@ fun ExplorerScreen(
     var showDeleteDialog by remember { mutableStateOf(false) }
     var showActionMenu by remember { mutableStateOf(false) }
     var showInstallDialog by remember { mutableStateOf(false) }
+    var showZipPasswordDialog by remember { mutableStateOf(false) }
+    var zipPasswordInput by remember { mutableStateOf("") }
     var selectedApkInfo by remember { mutableStateOf<com.dewa.filemanager.utils.ApkInfo?>(null) }
     var isLeftSourceForAction by remember { mutableStateOf(true) }
+    var archivePasswordRequest by remember { mutableStateOf<ArchivePasswordRequest?>(null) }
+    var archivePasswordInput by remember { mutableStateOf("") }
 
     val scope = rememberCoroutineScope()
     val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val context = LocalContext.current
 
     val processingMessage by viewModel.processingMessage.collectAsState()
     
@@ -62,11 +73,135 @@ fun ExplorerScreen(
     val rightSearchQuery by viewModel.rightSearchQuery.collectAsState()
     var isSearchActive by remember { mutableStateOf(false) }
 
-    androidx.activity.compose.BackHandler(enabled = isSearchActive || (activePane == 0 && leftPath != "/") || (activePane == 1 && rightPath != "/")) {
+    fun getPaneArchive(isLeft: Boolean): ArchivePaneState? = if (isLeft) leftArchiveState else rightArchiveState
+    fun setPaneArchive(isLeft: Boolean, value: ArchivePaneState?) {
+        viewModel.setArchiveState(isLeftPane = isLeft, state = value)
+    }
+
+    fun setPaneArchivePath(isLeft: Boolean, path: String) {
+        viewModel.setArchivePath(isLeftPane = isLeft, path = path)
+    }
+
+    suspend fun mountArchive(
+        isLeft: Boolean,
+        archiveRealPath: String,
+        displayName: String,
+        existingLayers: List<ArchiveLayer>,
+        password: String?
+    ) {
+        when (val browse = withContext(Dispatchers.IO) {
+            ArchiveRepository.browseArchive(archiveRealPath, password)
+        }) {
+            is ArchiveRepository.ArchiveBrowseResult.Success -> {
+                val layer = ArchiveLayer(
+                    realArchivePath = archiveRealPath,
+                    displayName = displayName,
+                    password = password,
+                    currentPath = "",
+                    entries = browse.entries
+                )
+                setPaneArchive(isLeft, ArchivePaneState(existingLayers + layer))
+            }
+            is ArchiveRepository.ArchiveBrowseResult.PasswordRequired -> {
+                archivePasswordRequest = ArchivePasswordRequest(
+                    isLeftPane = isLeft,
+                    realArchivePath = archiveRealPath,
+                    displayName = displayName,
+                    existingLayers = existingLayers,
+                    reason = "Arsip terkunci. Masukkan kata sandi."
+                )
+                archivePasswordInput = ""
+            }
+            is ArchiveRepository.ArchiveBrowseResult.InvalidPassword -> {
+                archivePasswordRequest = ArchivePasswordRequest(
+                    isLeftPane = isLeft,
+                    realArchivePath = archiveRealPath,
+                    displayName = displayName,
+                    existingLayers = existingLayers,
+                    reason = "Kata sandi salah. Coba lagi."
+                )
+            }
+            is ArchiveRepository.ArchiveBrowseResult.Error -> {
+                // No-op for now; avoid blocking explorer flow.
+            }
+        }
+    }
+
+    suspend fun refreshArchivePane(isLeft: Boolean) {
+        val state = getPaneArchive(isLeft) ?: return
+        val top = state.top
+        when (val browse = withContext(Dispatchers.IO) {
+            ArchiveRepository.browseArchive(top.realArchivePath, top.password)
+        }) {
+            is ArchiveRepository.ArchiveBrowseResult.Success -> {
+                val updatedTop = top.copy(entries = browse.entries)
+                setPaneArchive(isLeft, state.copy(layers = state.layers.dropLast(1) + updatedTop))
+            }
+            else -> Unit
+        }
+    }
+
+    fun navigateArchiveUp(isLeft: Boolean): Boolean {
+        return viewModel.navigateArchiveUp(isLeftPane = isLeft)
+    }
+
+    suspend fun openArchiveEntry(isLeft: Boolean, file: FileEntity) {
+        val state = getPaneArchive(isLeft) ?: return
+        val top = state.top
+        val outputDir = File(context.cacheDir, "archive_open").apply { mkdirs() }
+        val extracted = withContext(Dispatchers.IO) {
+            ArchiveRepository.extractArchiveEntry(
+                archivePath = top.realArchivePath,
+                entryPath = file.path,
+                destPath = outputDir.absolutePath,
+                password = top.password
+            )
+        } ?: return
+
+        if (file.name.isArchiveExt()) {
+            mountArchive(
+                isLeft = isLeft,
+                archiveRealPath = extracted,
+                displayName = file.name,
+                existingLayers = state.layers,
+                password = null
+            )
+            return
+        }
+
+        val ext = file.name.substringAfterLast('.', "").lowercase(Locale.ROOT)
+        val isImage = ext in listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
+        val isVideo = ext in listOf("mp4", "mkv", "avi", "webm", "mov")
+        if (isImage) {
+            onNavigateToImageViewer(extracted)
+        } else if (isVideo) {
+            onNavigateToVideoPlayer(extracted)
+        } else if (isEditableTextFileName(file.name)) {
+            onNavigateToEditor(
+                extracted,
+                com.dewa.filemanager.ui.editor.ArchiveEditTarget(
+                    archivePath = top.realArchivePath,
+                    entryPath = file.path,
+                    password = top.password
+                )
+            )
+        } else {
+            FileOpener.openFile(context, extracted)
+        }
+    }
+
+    val activeArchive = if (activePane == 0) leftArchiveState else rightArchiveState
+    val activeCanArchiveBack = activeArchive?.let { it.top.currentPath.isNotBlank() || it.layers.size > 1 } == true
+    val activeFsPath = if (activePane == 0) leftPath else rightPath
+    val canGoFsBack = activeFsPath != "/"
+
+    androidx.activity.compose.BackHandler(enabled = isSearchActive || activeCanArchiveBack || activeArchive != null || canGoFsBack) {
         if (isSearchActive) {
             isSearchActive = false
             viewModel.setLeftSearchQuery("")
             viewModel.setRightSearchQuery("")
+        } else if (activeArchive != null) {
+            navigateArchiveUp(activePane == 0)
         } else {
             val path = if (activePane == 0) leftPath else rightPath
             val parent = File(path).parent ?: "/"
@@ -76,10 +211,26 @@ fun ExplorerScreen(
 
     MTDrawer(
         drawerState = drawerState,
-        storageStats = storageStats
+        storageStats = storageStats,
+        isDarkMode = isDarkMode,
+        onThemeToggle = onThemeToggle,
+        onStorageClick = {
+            activePane = 0
+            isSearchActive = false
+            viewModel.resetPanelsToRoot()
+        },
+        onRecycleBinClick = {
+            isSearchActive = false
+            viewModel.openRecycleBin(isLeftPane = activePane == 0)
+        }
     ) {
-        val currentPath = if (activePane == 0) leftPath else rightPath
-        val currentFiles = if (activePane == 0) leftFiles else rightFiles
+        val displayedLeftPath = leftArchiveState?.let(::archiveDisplayPath) ?: leftPath
+        val displayedRightPath = rightArchiveState?.let(::archiveDisplayPath) ?: rightPath
+        val displayedLeftFiles = leftArchiveState?.let(::buildArchiveNodes) ?: leftFiles
+        val displayedRightFiles = rightArchiveState?.let(::buildArchiveNodes) ?: rightFiles
+
+        val currentPath = if (activePane == 0) displayedLeftPath else displayedRightPath
+        val currentFiles = if (activePane == 0) displayedLeftFiles else displayedRightFiles
         val (folders, fileCount) = viewModel.getCounts(currentFiles)
 
         Scaffold(
@@ -103,73 +254,134 @@ fun ExplorerScreen(
                         }
                     },
                     onMenuClick = { scope.launch { drawerState.open() } },
-                    onRefresh = { viewModel.refreshAll() }
+                    onRefresh = {
+                        scope.launch {
+                            if (activePane == 0 && leftArchiveState != null) {
+                                refreshArchivePane(isLeft = true)
+                            } else if (activePane == 1 && rightArchiveState != null) {
+                                refreshArchivePane(isLeft = false)
+                            } else {
+                                viewModel.refreshAll()
+                            }
+                        }
+                    }
                 )
             },
             bottomBar = {
                 MTBottomBar(
                     onBack = { 
-                        val path = if (activePane == 0) leftPath else rightPath
-                        val parent = File(path).parent ?: path
-                        if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                        if (activePane == 0 && leftArchiveState != null) {
+                            navigateArchiveUp(isLeft = true)
+                        } else if (activePane == 1 && rightArchiveState != null) {
+                            navigateArchiveUp(isLeft = false)
+                        } else {
+                            val path = if (activePane == 0) leftPath else rightPath
+                            val parent = File(path).parent ?: path
+                            if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                        }
                     },
                     onForward = { /* TODO */ },
                     onAdd = {
-                        currentCreatingPath = if (activePane == 0) leftPath else rightPath
-                        showCreateDialog = true
+                        if (activePane == 0 && leftArchiveState == null) {
+                            currentCreatingPath = leftPath
+                            showCreateDialog = true
+                        } else if (activePane == 1 && rightArchiveState == null) {
+                            currentCreatingPath = rightPath
+                            showCreateDialog = true
+                        }
                     },
                     onTransfer = { /* TODO */ },
                     onUp = {
-                        val path = if (activePane == 0) leftPath else rightPath
-                        val parent = File(path).parent ?: path
-                        if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                        if (activePane == 0 && leftArchiveState != null) {
+                            navigateArchiveUp(isLeft = true)
+                        } else if (activePane == 1 && rightArchiveState != null) {
+                            navigateArchiveUp(isLeft = false)
+                        } else {
+                            val path = if (activePane == 0) leftPath else rightPath
+                            val parent = File(path).parent ?: path
+                            if (activePane == 0) viewModel.navigateLeft(parent) else viewModel.navigateRight(parent)
+                        }
                     }
                 )
             }
         ) { innerPadding ->
-            val context = androidx.compose.ui.platform.LocalContext.current
             Box(Modifier.fillMaxSize()) {
                 Column(modifier = Modifier.padding(innerPadding)) {
                     Row(modifier = Modifier.fillMaxSize()) {
                         Box(modifier = Modifier.weight(1f)) {
                             Column(modifier = Modifier.clickable { activePane = 0 }) {
                                 Breadcrumb(
-                                    path = leftPath,
+                                    path = displayedLeftPath,
                                     onPathClick = { 
                                         activePane = 0
-                                        viewModel.navigateLeft(it) 
+                                        if (leftArchiveState != null) {
+                                            val state = leftArchiveState!!
+                                            val full = it.trim('/')
+                                            val stackPrefix = state.layers.joinToString("/") { layer -> layer.displayName }
+                                            val relative = full.removePrefix(stackPrefix).trim('/').let { rel ->
+                                                if (rel.isBlank()) "" else "$rel/"
+                                            }
+                                            setPaneArchivePath(isLeft = true, path = relative)
+                                        } else {
+                                            viewModel.navigateLeft(it)
+                                        }
                                     },
                                     isActive = activePane == 0
                                 )
                                 FilePagerList(
-                                    files = leftFiles,
+                                    files = displayedLeftFiles,
                                     onFileClick = { file ->
+                                        if (activePane != 0) {
+                                            activePane = 0
+                                            return@FilePagerList
+                                        }
                                         activePane = 0
-                                        if (file.isDirectory) {
+                                        val archiveState = leftArchiveState
+                                        if (archiveState != null) {
+                                            if (file.isDirectory) {
+                                                setPaneArchivePath(isLeft = true, path = file.path)
+                                            } else {
+                                                scope.launch { openArchiveEntry(isLeft = true, file = file) }
+                                            }
+                                        } else if (file.isDirectory) {
                                             viewModel.navigateLeft(file.path)
                                         } else if (file.name.endsWith(".apk", ignoreCase = true)) {
                                             selectedFileForAction = file
                                             selectedApkInfo = com.dewa.filemanager.utils.ApkInfoHelper.getApkInfo(context, file.path)
                                             showInstallDialog = true
                                         } else {
-                                            val ext = file.name.substringAfterLast('.', "").lowercase()
-                                            val editableExtensions = setOf("txt", "md", "log", "conf", "ini", "properties", "xml", "java", "kt", "kts", "js", "mjs", "ts", "html", "htm", "css", "scss", "sass", "less", "php", "py", "c", "cpp", "h", "hpp", "cs", "go", "rs", "rb", "swift", "dart", "smali", "json", "yml", "yaml", "sql", "sh", "bat")
+                                            val ext = file.name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                                             val isImage = ext in listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
                                             val isVideo = ext in listOf("mp4", "mkv", "avi", "webm", "mov")
                                             
-                                            if (isImage) {
+                                            if (file.name.isArchiveExt()) {
+                                                scope.launch {
+                                                    mountArchive(
+                                                        isLeft = true,
+                                                        archiveRealPath = file.path,
+                                                        displayName = file.name,
+                                                        existingLayers = emptyList(),
+                                                        password = null
+                                                    )
+                                                }
+                                            } else if (isImage) {
                                                 onNavigateToImageViewer(file.path)
                                             } else if (isVideo) {
                                                 onNavigateToVideoPlayer(file.path)
-                                            } else if (ext in editableExtensions) {
-                                                onNavigateToEditor(file.path)
+                                            } else if (isEditableTextFileName(file.name)) {
+                                                onNavigateToEditor(file.path, null)
                                             } else {
                                                 FileOpener.openFile(context, file.path)
                                             }
                                         }
                                     },
                                     onFileLongClick = { file ->
+                                        if (activePane != 0) {
+                                            activePane = 0
+                                            return@FilePagerList
+                                        }
                                         activePane = 0
+                                        if (leftArchiveState != null) return@FilePagerList
                                         selectedFileForAction = file
                                         isLeftSourceForAction = true
                                         showActionMenu = true
@@ -183,42 +395,77 @@ fun ExplorerScreen(
                         Box(modifier = Modifier.weight(1f)) {
                             Column(modifier = Modifier.clickable { activePane = 1 }) {
                                 Breadcrumb(
-                                    path = rightPath, 
+                                    path = displayedRightPath, 
                                     onPathClick = { 
                                         activePane = 1
-                                        viewModel.navigateRight(it) 
+                                        if (rightArchiveState != null) {
+                                            val state = rightArchiveState!!
+                                            val full = it.trim('/')
+                                            val stackPrefix = state.layers.joinToString("/") { layer -> layer.displayName }
+                                            val relative = full.removePrefix(stackPrefix).trim('/').let { rel ->
+                                                if (rel.isBlank()) "" else "$rel/"
+                                            }
+                                            setPaneArchivePath(isLeft = false, path = relative)
+                                        } else {
+                                            viewModel.navigateRight(it)
+                                        }
                                     },
                                     isActive = activePane == 1
                                 )
                                 FilePagerList(
-                                    files = rightFiles,
+                                    files = displayedRightFiles,
                                     onFileClick = { file ->
+                                        if (activePane != 1) {
+                                            activePane = 1
+                                            return@FilePagerList
+                                        }
                                         activePane = 1
-                                        if (file.isDirectory) {
+                                        val archiveState = rightArchiveState
+                                        if (archiveState != null) {
+                                            if (file.isDirectory) {
+                                                setPaneArchivePath(isLeft = false, path = file.path)
+                                            } else {
+                                                scope.launch { openArchiveEntry(isLeft = false, file = file) }
+                                            }
+                                        } else if (file.isDirectory) {
                                             viewModel.navigateRight(file.path)
                                         } else if (file.name.endsWith(".apk", ignoreCase = true)) {
                                             selectedFileForAction = file
                                             selectedApkInfo = com.dewa.filemanager.utils.ApkInfoHelper.getApkInfo(context, file.path)
                                             showInstallDialog = true
                                         } else {
-                                            val ext = file.name.substringAfterLast('.', "").lowercase()
-                                            val editableExtensions = setOf("txt", "md", "log", "conf", "ini", "properties", "xml", "java", "kt", "kts", "js", "mjs", "ts", "html", "htm", "css", "scss", "sass", "less", "php", "py", "c", "cpp", "h", "hpp", "cs", "go", "rs", "rb", "swift", "dart", "smali", "json", "yml", "yaml", "sql", "sh", "bat")
+                                            val ext = file.name.substringAfterLast('.', "").lowercase(Locale.ROOT)
                                             val isImage = ext in listOf("jpg", "jpeg", "png", "webp", "bmp", "gif")
                                             val isVideo = ext in listOf("mp4", "mkv", "avi", "webm", "mov")
                                             
-                                            if (isImage) {
+                                            if (file.name.isArchiveExt()) {
+                                                scope.launch {
+                                                    mountArchive(
+                                                        isLeft = false,
+                                                        archiveRealPath = file.path,
+                                                        displayName = file.name,
+                                                        existingLayers = emptyList(),
+                                                        password = null
+                                                    )
+                                                }
+                                            } else if (isImage) {
                                                 onNavigateToImageViewer(file.path)
                                             } else if (isVideo) {
                                                 onNavigateToVideoPlayer(file.path)
-                                            } else if (ext in editableExtensions) {
-                                                onNavigateToEditor(file.path)
+                                            } else if (isEditableTextFileName(file.name)) {
+                                                onNavigateToEditor(file.path, null)
                                             } else {
                                                 FileOpener.openFile(context, file.path)
                                             }
                                         }
                                     },
                                     onFileLongClick = { file: FileEntity ->
+                                        if (activePane != 1) {
+                                            activePane = 1
+                                            return@FilePagerList
+                                        }
                                         activePane = 1
+                                        if (rightArchiveState != null) return@FilePagerList
                                         selectedFileForAction = file
                                         isLeftSourceForAction = false
                                         showActionMenu = true
@@ -313,7 +560,8 @@ fun ExplorerScreen(
                             label = "Kompres ke ZIP",
                             onClick = {
                                 showActionMenu = false
-                                viewModel.compressToZip(selectedFileForAction!!.path)
+                                zipPasswordInput = ""
+                                showZipPasswordDialog = true
                             }
                         )
                     }
@@ -364,6 +612,83 @@ fun ExplorerScreen(
             onConfirm = {
                 viewModel.deleteItem(selectedFileForAction!!.path)
                 showDeleteDialog = false
+            }
+        )
+    }
+
+    if (showZipPasswordDialog && selectedFileForAction != null) {
+        AlertDialog(
+            onDismissRequest = { showZipPasswordDialog = false },
+            title = { Text("Kompres ke ZIP") },
+            text = {
+                Column {
+                    Text(
+                        "Opsional: isi kata sandi jika ingin ZIP terkunci.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = zipPasswordInput,
+                        onValueChange = { zipPasswordInput = it },
+                        singleLine = true,
+                        label = { Text("Kata sandi ZIP (opsional)") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val password = zipPasswordInput.trim().ifBlank { null }
+                    viewModel.compressToZip(selectedFileForAction!!.path, password)
+                    showZipPasswordDialog = false
+                }) { Text("Kompres") }
+            },
+            dismissButton = {
+                TextButton(onClick = { showZipPasswordDialog = false }) { Text("Batal") }
+            }
+        )
+    }
+
+    archivePasswordRequest?.let { req ->
+        AlertDialog(
+            onDismissRequest = { archivePasswordRequest = null },
+            title = { Text("Arsip Terkunci") },
+            text = {
+                Column {
+                    Text(
+                        text = req.reason,
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Spacer(modifier = Modifier.height(10.dp))
+                    OutlinedTextField(
+                        value = archivePasswordInput,
+                        onValueChange = { archivePasswordInput = it },
+                        singleLine = true,
+                        label = { Text("Kata sandi") },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val pwd = archivePasswordInput
+                        scope.launch {
+                            mountArchive(
+                                isLeft = req.isLeftPane,
+                                archiveRealPath = req.realArchivePath,
+                                displayName = req.displayName,
+                                existingLayers = req.existingLayers,
+                                password = pwd
+                            )
+                        }
+                        archivePasswordRequest = null
+                    },
+                    enabled = archivePasswordInput.isNotBlank()
+                ) { Text("Buka") }
+            },
+            dismissButton = {
+                TextButton(onClick = { archivePasswordRequest = null }) { Text("Batal") }
             }
         )
     }
