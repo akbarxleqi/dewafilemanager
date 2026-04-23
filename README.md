@@ -135,7 +135,7 @@ Diambil dari konfigurasi project saat ini:
 
 ## 👨‍💻 Developer
 
-**Devi Akbar**  
+**Akbar**  
 Mahasiswa Universitas Siber Muhammadiyah  
 📧 **akbarxtech@gmail.com**
 
