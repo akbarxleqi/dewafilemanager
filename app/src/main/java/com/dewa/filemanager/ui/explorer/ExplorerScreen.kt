@@ -37,7 +37,10 @@ fun ExplorerScreen(
     onNavigateToImageViewer: (String) -> Unit = {},
     onNavigateToVideoPlayer: (String) -> Unit = {},
     onNavigateToArchive: (String) -> Unit = {},
-    onNavigateToApkExtractor: () -> Unit = {}
+    onNavigateToApkExtractor: () -> Unit = {},
+    onNavigateToTextNotes: () -> Unit = {},
+    onNavigateToPasswordManager: () -> Unit = {},
+    onNavigateToSignatureKeyManager: () -> Unit = {}
 ) {
     val viewModel: ExplorerViewModel = viewModel()
     val leftPath by viewModel.leftPath.collectAsState()
@@ -226,6 +229,15 @@ fun ExplorerScreen(
         },
         onApkExtractClick = {
             onNavigateToApkExtractor()
+        },
+        onTextEditorClick = {
+            onNavigateToTextNotes()
+        },
+        onPasswordManagerClick = {
+            onNavigateToPasswordManager()
+        },
+        onSignatureKeyClick = {
+            onNavigateToSignatureKeyManager()
         }
     ) {
         val displayedLeftPath = leftArchiveState?.let(::archiveDisplayPath) ?: leftPath

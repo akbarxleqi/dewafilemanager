@@ -53,6 +53,8 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.zip4j)
     implementation(libs.junrar)
+    implementation(libs.bcprov)
+    implementation(libs.bcpkix)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

@@ -25,8 +25,11 @@ import com.dewa.filemanager.utils.PermissionManager
 import com.dewa.filemanager.ui.editor.ArchiveEditTarget
 import com.dewa.filemanager.data.repository.ArchiveRepository
 import com.dewa.filemanager.ui.apkextractor.ApkExtractorScreen
+import com.dewa.filemanager.ui.notes.TextNotesScreen
+import com.dewa.filemanager.ui.password.PasswordManagerScreen
+import com.dewa.filemanager.ui.signaturekey.SignatureKeyManagerScreen
 
-enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE, APK_EXTRACTOR }
+enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE, APK_EXTRACTOR, TEXT_NOTES, PASSWORD_MANAGER, SIGNATURE_KEY_MANAGER }
 
 class MainActivity : ComponentActivity() {
     private val hasPermissionState = mutableStateOf(false)
@@ -78,6 +81,21 @@ class MainActivity : ComponentActivity() {
                                         currentPathForViewer = null
                                         currentArchiveEditTarget = null
                                         currentViewer = ViewerType.APK_EXTRACTOR
+                                    },
+                                    onNavigateToTextNotes = {
+                                        currentPathForViewer = null
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.TEXT_NOTES
+                                    },
+                                    onNavigateToPasswordManager = {
+                                        currentPathForViewer = null
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.PASSWORD_MANAGER
+                                    },
+                                    onNavigateToSignatureKeyManager = {
+                                        currentPathForViewer = null
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.SIGNATURE_KEY_MANAGER
                                     }
                                 )
                             }
@@ -136,6 +154,24 @@ class MainActivity : ComponentActivity() {
                             ViewerType.APK_EXTRACTOR -> {
                                 BackHandler { currentViewer = ViewerType.NONE }
                                 ApkExtractorScreen(
+                                    onBack = { currentViewer = ViewerType.NONE }
+                                )
+                            }
+                            ViewerType.TEXT_NOTES -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                TextNotesScreen(
+                                    onBackToExplorer = { currentViewer = ViewerType.NONE }
+                                )
+                            }
+                            ViewerType.PASSWORD_MANAGER -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                PasswordManagerScreen(
+                                    onBack = { currentViewer = ViewerType.NONE }
+                                )
+                            }
+                            ViewerType.SIGNATURE_KEY_MANAGER -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                SignatureKeyManagerScreen(
                                     onBack = { currentViewer = ViewerType.NONE }
                                 )
                             }

@@ -11,6 +11,8 @@ composeBom = "2024.09.00"
 navigationCompose = "2.8.8"
 zip4j = "2.11.5"
 junrar = "7.5.5"
+bcprov = "1.78.1"
+bcpkix = "1.78.1"
 
 
 [libraries]
@@ -32,6 +34,8 @@ androidx-navigation-compose = { group = "androidx.navigation", name = "navigatio
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 zip4j = { group = "net.lingala.zip4j", name = "zip4j", version.ref = "zip4j" }
 junrar = { group = "com.github.junrar", name = "junrar", version.ref = "junrar" }
+bcprov = { group = "org.bouncycastle", name = "bcprov-jdk18on", version.ref = "bcprov" }
+bcpkix = { group = "org.bouncycastle", name = "bcpkix-jdk18on", version.ref = "bcpkix" }
 
 
 [plugins]

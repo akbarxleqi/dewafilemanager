@@ -21,10 +21,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Android
-import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
@@ -69,6 +67,9 @@ fun MTDrawer(
     onStorageClick: () -> Unit = {},
     onRecycleBinClick: () -> Unit = {},
     onApkExtractClick: () -> Unit = {},
+    onTextEditorClick: () -> Unit = {},
+    onPasswordManagerClick: () -> Unit = {},
+    onSignatureKeyClick: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -89,14 +90,11 @@ fun MTDrawer(
     val toolItems = listOf(
         DrawerToolItem("Tempat sampah", Icons.Default.Delete),
         DrawerToolItem("Manajer Plugin", Icons.Default.Extension),
-        DrawerToolItem("Manajemen Jarak Jauh", Icons.Default.Description),
-        DrawerToolItem("Pemilih Warna Layar", Icons.Default.ColorLens),
         DrawerToolItem("Kunci Tanda Tangan", Icons.Default.Key),
         DrawerToolItem("Kata Sandi Umum", Icons.Default.Lock),
         DrawerToolItem("Ekstrak APK", Icons.Default.Layers),
         DrawerToolItem("Editor Teks", Icons.Default.EditNote),
-        DrawerToolItem("Simulator Terminal", Icons.Default.Terminal),
-        DrawerToolItem("Catatan Aktivitas", Icons.Default.PhoneAndroid)
+        DrawerToolItem("Simulator Terminal", Icons.Default.Terminal)
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -237,9 +235,18 @@ fun MTDrawer(
                                     } else if (item.label == "Ekstrak APK") {
                                         onApkExtractClick()
                                         scope.launch { drawerState.close() }
-                                    } else {
-                                        Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
-                                    }
+                                    } else if (item.label == "Editor Teks") {
+                                        onTextEditorClick()
+                                        scope.launch { drawerState.close() }
+                                } else if (item.label == "Kata Sandi Umum") {
+                                    onPasswordManagerClick()
+                                    scope.launch { drawerState.close() }
+                                } else if (item.label == "Kunci Tanda Tangan") {
+                                    onSignatureKeyClick()
+                                    scope.launch { drawerState.close() }
+                                } else {
+                                    Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()
+                                }
                                 }
                             )
                         }

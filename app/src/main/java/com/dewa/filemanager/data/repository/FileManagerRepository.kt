@@ -11,6 +11,8 @@ class FileManagerRepository {
 
     private val appFolderName = "D-Manager"
     private val recycleFolderName = "recycle"
+    private val passwordFolderName = "password"
+    private val signatureKeyFolderName = "signature-key"
 
     suspend fun listFiles(path: String): List<FileEntity> = withContext(Dispatchers.IO) {
         val directory = File(path)
@@ -40,12 +42,22 @@ class FileManagerRepository {
 
     fun getRecyclePath(): String = File(getManagerRootPath(), recycleFolderName).absolutePath
 
+    fun getPasswordPath(): String = File(getManagerRootPath(), passwordFolderName).absolutePath
+
+    fun getSignatureKeyPath(): String = File(getManagerRootPath(), signatureKeyFolderName).absolutePath
+
     fun ensureAppDirectories() {
         val managerDir = File(getManagerRootPath())
         if (!managerDir.exists()) managerDir.mkdirs()
 
         val recycleDir = File(getRecyclePath())
         if (!recycleDir.exists()) recycleDir.mkdirs()
+
+        val passwordDir = File(getPasswordPath())
+        if (!passwordDir.exists()) passwordDir.mkdirs()
+
+        val signatureKeyDir = File(getSignatureKeyPath())
+        if (!signatureKeyDir.exists()) signatureKeyDir.mkdirs()
     }
 
     fun deleteItem(path: String): Boolean {
