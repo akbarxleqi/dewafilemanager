@@ -24,8 +24,9 @@ import com.dewa.filemanager.ui.theme.DewaManagerTheme
 import com.dewa.filemanager.utils.PermissionManager
 import com.dewa.filemanager.ui.editor.ArchiveEditTarget
 import com.dewa.filemanager.data.repository.ArchiveRepository
+import com.dewa.filemanager.ui.apkextractor.ApkExtractorScreen
 
-enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE }
+enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE, APK_EXTRACTOR }
 
 class MainActivity : ComponentActivity() {
     private val hasPermissionState = mutableStateOf(false)
@@ -72,6 +73,11 @@ class MainActivity : ComponentActivity() {
                                         currentPathForViewer = path
                                         currentArchiveEditTarget = null
                                         currentViewer = ViewerType.ARCHIVE
+                                    },
+                                    onNavigateToApkExtractor = {
+                                        currentPathForViewer = null
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.APK_EXTRACTOR
                                     }
                                 )
                             }
@@ -126,6 +132,12 @@ class MainActivity : ComponentActivity() {
                                         onBack = { currentViewer = ViewerType.NONE }
                                     )
                                 }
+                            }
+                            ViewerType.APK_EXTRACTOR -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                ApkExtractorScreen(
+                                    onBack = { currentViewer = ViewerType.NONE }
+                                )
                             }
                         }
                     } else {

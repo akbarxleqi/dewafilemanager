@@ -68,6 +68,7 @@ fun MTDrawer(
     onThemeToggle: () -> Unit = {},
     onStorageClick: () -> Unit = {},
     onRecycleBinClick: () -> Unit = {},
+    onApkExtractClick: () -> Unit = {},
     content: @Composable () -> Unit
 ) {
     val scope = androidx.compose.runtime.rememberCoroutineScope()
@@ -232,6 +233,9 @@ fun MTDrawer(
                                 onClick = {
                                     if (item.label == "Tempat sampah") {
                                         onRecycleBinClick()
+                                        scope.launch { drawerState.close() }
+                                    } else if (item.label == "Ekstrak APK") {
+                                        onApkExtractClick()
                                         scope.launch { drawerState.close() }
                                     } else {
                                         Toast.makeText(context, "Coming soon", Toast.LENGTH_SHORT).show()

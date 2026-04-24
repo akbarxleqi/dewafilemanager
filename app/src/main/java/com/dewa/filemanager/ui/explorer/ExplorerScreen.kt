@@ -36,7 +36,8 @@ fun ExplorerScreen(
     onNavigateToEditor: (String, com.dewa.filemanager.ui.editor.ArchiveEditTarget?) -> Unit = { _, _ -> },
     onNavigateToImageViewer: (String) -> Unit = {},
     onNavigateToVideoPlayer: (String) -> Unit = {},
-    onNavigateToArchive: (String) -> Unit = {}
+    onNavigateToArchive: (String) -> Unit = {},
+    onNavigateToApkExtractor: () -> Unit = {}
 ) {
     val viewModel: ExplorerViewModel = viewModel()
     val leftPath by viewModel.leftPath.collectAsState()
@@ -222,6 +223,9 @@ fun ExplorerScreen(
         onRecycleBinClick = {
             isSearchActive = false
             viewModel.openRecycleBin(isLeftPane = activePane == 0)
+        },
+        onApkExtractClick = {
+            onNavigateToApkExtractor()
         }
     ) {
         val displayedLeftPath = leftArchiveState?.let(::archiveDisplayPath) ?: leftPath
