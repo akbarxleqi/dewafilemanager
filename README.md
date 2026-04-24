@@ -46,6 +46,13 @@ File manager Android berbasis **Kotlin + Jetpack Compose** dengan gaya dual-pane
   - Detail APK (package, version, signature, SDK info).
   - Install APK dari file manager.
 
+- **Signature Key Manager**
+  - Kelola file keystore langsung dari drawer `Kunci Tanda Tangan`.
+  - Buat keystore baru dengan format `.jks` dan `.bks`.
+  - Form pembuatan key mendukung password store, alias, alias password, masa berlaku, dan identitas sertifikat.
+  - Mendukung hapus keystore dari daftar.
+  - Mode `JKS` dibuat kompatibel untuk kebutuhan signing APK Android di device.
+
 - **Media Viewer**
   - Image viewer (zoom/pan).
   - Video player bawaan.
@@ -127,6 +134,7 @@ Diambil dari konfigurasi project saat ini:
 
 - `app/src/main/java/com/dewa/filemanager/ui/explorer/` → layar utama dual pane
 - `app/src/main/java/com/dewa/filemanager/ui/editor/` → text/code editor
+- `app/src/main/java/com/dewa/filemanager/ui/signaturekey/` → manajer keystore / signature key
 - `app/src/main/java/com/dewa/filemanager/ui/viewer/` → image/video/archive viewer
 - `app/src/main/java/com/dewa/filemanager/data/repository/` → operasi file & arsip
 - `docs/screenshots/` → screenshot README
