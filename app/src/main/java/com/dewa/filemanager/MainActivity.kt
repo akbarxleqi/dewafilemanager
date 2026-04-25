@@ -45,9 +45,10 @@ import com.dewa.filemanager.ui.apkextractor.ApkExtractorScreen
 import com.dewa.filemanager.ui.notes.TextNotesScreen
 import com.dewa.filemanager.ui.password.PasswordManagerScreen
 import com.dewa.filemanager.ui.signaturekey.SignatureKeyManagerScreen
+import com.dewa.filemanager.ui.terminal.TerminalBridgeScreen
 import androidx.compose.ui.text.font.FontWeight
 
-enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE, APK_EXTRACTOR, TEXT_NOTES, PASSWORD_MANAGER, SIGNATURE_KEY_MANAGER }
+enum class ViewerType { NONE, EDITOR, IMAGE, VIDEO, ARCHIVE, APK_EXTRACTOR, TEXT_NOTES, TERMINAL, PASSWORD_MANAGER, SIGNATURE_KEY_MANAGER }
 
 class MainActivity : ComponentActivity() {
     private val hasPermissionState = mutableStateOf(false)
@@ -104,6 +105,11 @@ class MainActivity : ComponentActivity() {
                                         currentPathForViewer = null
                                         currentArchiveEditTarget = null
                                         currentViewer = ViewerType.TEXT_NOTES
+                                    },
+                                    onNavigateToTerminal = { path ->
+                                        currentPathForViewer = path
+                                        currentArchiveEditTarget = null
+                                        currentViewer = ViewerType.TERMINAL
                                     },
                                     onNavigateToPasswordManager = {
                                         currentPathForViewer = null
@@ -179,6 +185,13 @@ class MainActivity : ComponentActivity() {
                                 BackHandler { currentViewer = ViewerType.NONE }
                                 TextNotesScreen(
                                     onBackToExplorer = { currentViewer = ViewerType.NONE }
+                                )
+                            }
+                            ViewerType.TERMINAL -> {
+                                BackHandler { currentViewer = ViewerType.NONE }
+                                TerminalBridgeScreen(
+                                    initialPath = currentPathForViewer ?: "/storage/emulated/0",
+                                    onBack = { currentViewer = ViewerType.NONE }
                                 )
                             }
                             ViewerType.PASSWORD_MANAGER -> {

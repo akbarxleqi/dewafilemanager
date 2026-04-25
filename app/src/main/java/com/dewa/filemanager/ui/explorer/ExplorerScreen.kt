@@ -39,6 +39,7 @@ fun ExplorerScreen(
     onNavigateToArchive: (String) -> Unit = {},
     onNavigateToApkExtractor: () -> Unit = {},
     onNavigateToTextNotes: () -> Unit = {},
+    onNavigateToTerminal: (String) -> Unit = {},
     onNavigateToPasswordManager: () -> Unit = {},
     onNavigateToSignatureKeyManager: () -> Unit = {}
 ) {
@@ -232,6 +233,9 @@ fun ExplorerScreen(
         },
         onTextEditorClick = {
             onNavigateToTextNotes()
+        },
+        onTerminalClick = {
+            onNavigateToTerminal(if (activePane == 0) leftPath else rightPath)
         },
         onPasswordManagerClick = {
             onNavigateToPasswordManager()

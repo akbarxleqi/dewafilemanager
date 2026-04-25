@@ -1,6 +1,7 @@
 package com.dewa.filemanager.ui.signaturekey
 
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -214,6 +215,7 @@ fun SignatureKeyManagerScreen(
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun SignatureKeyRow(
     item: SignatureKeyEntry,

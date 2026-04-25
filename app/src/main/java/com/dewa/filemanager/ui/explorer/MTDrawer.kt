@@ -68,6 +68,7 @@ fun MTDrawer(
     onRecycleBinClick: () -> Unit = {},
     onApkExtractClick: () -> Unit = {},
     onTextEditorClick: () -> Unit = {},
+    onTerminalClick: () -> Unit = {},
     onPasswordManagerClick: () -> Unit = {},
     onSignatureKeyClick: () -> Unit = {},
     content: @Composable () -> Unit
@@ -94,7 +95,7 @@ fun MTDrawer(
         DrawerToolItem("Kata Sandi Umum", Icons.Default.Lock),
         DrawerToolItem("Ekstrak APK", Icons.Default.Layers),
         DrawerToolItem("Editor Teks", Icons.Default.EditNote),
-        DrawerToolItem("Simulator Terminal", Icons.Default.Terminal)
+        DrawerToolItem("Terminal", Icons.Default.Terminal)
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -238,6 +239,9 @@ fun MTDrawer(
                                     } else if (item.label == "Editor Teks") {
                                         onTextEditorClick()
                                         scope.launch { drawerState.close() }
+                                } else if (item.label == "Terminal") {
+                                    onTerminalClick()
+                                    scope.launch { drawerState.close() }
                                 } else if (item.label == "Kata Sandi Umum") {
                                     onPasswordManagerClick()
                                     scope.launch { drawerState.close() }
