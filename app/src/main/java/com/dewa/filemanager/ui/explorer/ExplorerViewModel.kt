@@ -1,6 +1,7 @@
 package com.dewa.filemanager.ui.explorer
 
-import androidx.lifecycle.ViewModel
+import android.app.Application
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.dewa.filemanager.data.model.FileEntity
 import com.dewa.filemanager.data.repository.ArchiveRepository
@@ -11,8 +12,10 @@ import kotlinx.coroutines.launch
 import java.io.File
 
 class ExplorerViewModel(
-    private val repository: FileManagerRepository = FileManagerRepository()
-) : ViewModel() {
+    application: Application
+) : AndroidViewModel(application) {
+
+    private val repository: FileManagerRepository = FileManagerRepository(application.applicationContext)
 
     private val _processingMessage = MutableStateFlow<String?>(null)
     val processingMessage: StateFlow<String?> = _processingMessage
@@ -31,6 +34,9 @@ class ExplorerViewModel(
 
     private val _storageStats = MutableStateFlow<FileManagerRepository.StorageStats?>(null)
     val storageStats: StateFlow<FileManagerRepository.StorageStats?> = _storageStats
+
+    private val _externalStorageLocations = MutableStateFlow<List<FileManagerRepository.StorageLocation>>(emptyList())
+    val externalStorageLocations: StateFlow<List<FileManagerRepository.StorageLocation>> = _externalStorageLocations
 
     private val _leftSearchQuery = MutableStateFlow("")
     val leftSearchQuery: StateFlow<String> = _leftSearchQuery
@@ -160,6 +166,21 @@ class ExplorerViewModel(
 
     private fun updateStorageStats() {
         _storageStats.value = repository.getStorageStats()
+        _externalStorageLocations.value = repository.getExternalStorageLocations()
+    }
+
+    fun openExternalStorage(path: String, isLeftPane: Boolean) {
+        if (isLeftPane) {
+            _leftArchiveState.value = null
+            _leftPath.value = path
+            _leftSearchQuery.value = ""
+            refreshLeft()
+        } else {
+            _rightArchiveState.value = null
+            _rightPath.value = path
+            _rightSearchQuery.value = ""
+            refreshRight()
+        }
     }
 
     fun createItem(path: String, name: String, isFolder: Boolean) {

@@ -62,9 +62,11 @@ import kotlinx.coroutines.launch
 fun MTDrawer(
     drawerState: DrawerState,
     storageStats: FileManagerRepository.StorageStats?,
+    externalStorageLocations: List<FileManagerRepository.StorageLocation> = emptyList(),
     isDarkMode: Boolean = true,
     onThemeToggle: () -> Unit = {},
     onStorageClick: () -> Unit = {},
+    onExternalStorageClick: (String) -> Unit = {},
     onRecycleBinClick: () -> Unit = {},
     onApkExtractClick: () -> Unit = {},
     onTextEditorClick: () -> Unit = {},
@@ -210,6 +212,43 @@ fun MTDrawer(
                                     scope.launch { drawerState.close() }
                                 }
                             )
+                        }
+
+                        externalStorageLocations.forEach { location ->
+                            val stats = location.stats
+                            if (stats != null) {
+                                DrawerStorageItem(
+                                    title = location.label,
+                                    icon = Icons.Default.SdStorage,
+                                    usedBytes = stats.usedBytes,
+                                    totalBytes = stats.totalBytes,
+                                    availableBytes = stats.availableBytes,
+                                    textPrimary = textPrimary,
+                                    textSecondary = textSecondary,
+                                    iconOnCircle = iconOnCircle,
+                                    primary = blue,
+                                    progressTrack = progressTrack,
+                                    iconCircle = iconCircle,
+                                    onClick = {
+                                        onExternalStorageClick(location.path)
+                                        scope.launch { drawerState.close() }
+                                    }
+                                )
+                            } else {
+                                DrawerSimpleLocationItem(
+                                    title = location.label,
+                                    icon = Icons.Default.SdStorage,
+                                    textPrimary = textPrimary,
+                                    textSecondary = textSecondary,
+                                    iconOnCircle = iconOnCircle,
+                                    iconCircle = iconCircle,
+                                    subtitle = location.path,
+                                    onClick = {
+                                        onExternalStorageClick(location.path)
+                                        scope.launch { drawerState.close() }
+                                    }
+                                )
+                            }
                         }
                     }
 
@@ -396,5 +435,49 @@ private fun DrawerToolRow(
             color = textPrimary,
             style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Normal)
         )
+    }
+}
+
+@Composable
+private fun DrawerSimpleLocationItem(
+    title: String,
+    icon: ImageVector,
+    textPrimary: Color,
+    textSecondary: Color,
+    iconOnCircle: Color,
+    iconCircle: Color,
+    subtitle: String,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(horizontal = 14.dp, vertical = 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Surface(
+            shape = CircleShape,
+            color = iconCircle,
+            modifier = Modifier.size(38.dp)
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Icon(icon, contentDescription = null, tint = iconOnCircle, modifier = Modifier.size(20.dp))
+            }
+        }
+        Spacer(modifier = Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = textPrimary,
+                style = TextStyle(fontSize = 15.sp, fontWeight = FontWeight.Medium)
+            )
+            Text(
+                text = subtitle,
+                color = textSecondary,
+                style = TextStyle(fontSize = 10.sp),
+                maxLines = 1
+            )
+        }
     }
 }

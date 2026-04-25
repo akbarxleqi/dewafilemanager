@@ -49,6 +49,7 @@ fun ExplorerScreen(
     val leftFiles by viewModel.leftFiles.collectAsState()
     val rightFiles by viewModel.rightFiles.collectAsState()
     val storageStats by viewModel.storageStats.collectAsState()
+    val externalStorageLocations by viewModel.externalStorageLocations.collectAsState()
     val leftArchiveState by viewModel.leftArchiveState.collectAsState()
     val rightArchiveState by viewModel.rightArchiveState.collectAsState()
     
@@ -217,6 +218,7 @@ fun ExplorerScreen(
     MTDrawer(
         drawerState = drawerState,
         storageStats = storageStats,
+        externalStorageLocations = externalStorageLocations,
         isDarkMode = isDarkMode,
         onThemeToggle = onThemeToggle,
         onStorageClick = {
@@ -227,6 +229,10 @@ fun ExplorerScreen(
         onRecycleBinClick = {
             isSearchActive = false
             viewModel.openRecycleBin(isLeftPane = activePane == 0)
+        },
+        onExternalStorageClick = { path ->
+            isSearchActive = false
+            viewModel.openExternalStorage(path = path, isLeftPane = activePane == 0)
         },
         onApkExtractClick = {
             onNavigateToApkExtractor()

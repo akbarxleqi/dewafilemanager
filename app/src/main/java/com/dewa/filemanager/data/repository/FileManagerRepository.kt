@@ -1,13 +1,17 @@
 package com.dewa.filemanager.data.repository
 
+import android.content.Context
 import android.os.Environment
 import android.os.StatFs
+import androidx.core.content.ContextCompat
 import com.dewa.filemanager.data.model.FileEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 
-class FileManagerRepository {
+class FileManagerRepository(
+    private val context: Context? = null
+) {
 
     private val appFolderName = "D-Manager"
     private val recycleFolderName = "recycle"
@@ -34,6 +38,70 @@ class FileManagerRepository {
             availableBytes = availableBlocks * blockSize,
             usedBytes = (totalBlocks - availableBlocks) * blockSize
         )
+    }
+
+    fun getExternalStorageLocations(): List<StorageLocation> {
+        val primaryRoot = getRootPath()
+        val locationsByPath = linkedMapOf<String, StorageLocation>()
+
+        // Most reliable detection across vendors: mounted app-external dirs, then trim to volume root.
+        context?.let { ctx ->
+            ContextCompat.getExternalFilesDirs(ctx, null)
+                .filterNotNull()
+                .forEach { dir ->
+                    val path = dir.absolutePath
+                    val volumeRoot = path.substringBefore("/Android/data/").takeIf { it.startsWith("/storage/") }
+                    if (volumeRoot != null && volumeRoot != primaryRoot) {
+                        val volumeName = File(volumeRoot).name
+                        val looksLikeSdCardId = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$").matches(volumeName)
+                        val label = if (looksLikeSdCardId) {
+                            "Kartu SD ($volumeName)"
+                        } else {
+                            "Penyimpanan Eksternal ($volumeName)"
+                        }
+                        val stats = runCatching { getStorageStats(volumeRoot) }.getOrNull()
+                        locationsByPath.putIfAbsent(
+                            volumeRoot,
+                            StorageLocation(
+                                label = label,
+                                path = volumeRoot,
+                                stats = stats
+                            )
+                        )
+                    }
+                }
+        }
+
+        // Fallback scan for devices that don't expose removable media via getExternalFilesDirs.
+        val storageRoot = File("/storage")
+        if (storageRoot.exists() && storageRoot.isDirectory) {
+            val ignored = setOf("emulated", "self")
+            storageRoot.listFiles()
+                ?.asSequence()
+                ?.filter { it.isDirectory && it.name !in ignored }
+                ?.filter { it.absolutePath != primaryRoot }
+                ?.filter { runCatching { it.listFiles() }.isSuccess }
+                ?.forEach { dir ->
+                    val volumeName = dir.name
+                    val looksLikeSdCardId = Regex("^[0-9A-Fa-f]{4}-[0-9A-Fa-f]{4}$").matches(volumeName)
+                    val label = if (looksLikeSdCardId) {
+                        "Kartu SD ($volumeName)"
+                    } else {
+                        "Penyimpanan Eksternal ($volumeName)"
+                    }
+                    val stats = runCatching { getStorageStats(dir.absolutePath) }.getOrNull()
+                    locationsByPath.putIfAbsent(
+                        dir.absolutePath,
+                        StorageLocation(
+                            label = label,
+                            path = dir.absolutePath,
+                            stats = stats
+                        )
+                    )
+                }
+        }
+
+        return locationsByPath.values.sortedBy { it.label.lowercase() }
     }
 
     fun getRootPath(): String = Environment.getExternalStorageDirectory().absolutePath
@@ -152,5 +220,11 @@ class FileManagerRepository {
         val totalBytes: Long,
         val availableBytes: Long,
         val usedBytes: Long
+    )
+
+    data class StorageLocation(
+        val label: String,
+        val path: String,
+        val stats: StorageStats? = null
     )
 }
