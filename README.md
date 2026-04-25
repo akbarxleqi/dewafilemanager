@@ -57,6 +57,14 @@ File manager Android berbasis **Kotlin + Jetpack Compose** dengan gaya dual-pane
   - Image viewer (zoom/pan).
   - Video player bawaan.
 
+- **Terminal Internal (Android Shell)**
+  - Terminal bawaan langsung di dalam D-Manager (tanpa bergantung app Termux eksternal).
+  - Multi-session tabs (`S1`, `S2`, dst), command history, dan restart session.
+  - Extra keys: `ESC`, `TAB`, `CTRL`, `ALT`, `/`, `-`, `|`.
+  - Preset tema terminal: **Default**, **Solarized**, **Amoled**.
+  - Working directory mengikuti panel aktif saat membuka Terminal dari drawer.
+  - Catatan: mode ini memakai shell Android (`/system/bin/sh`), sehingga command `pkg/apt` (Termux package manager) tidak tersedia.
+
 - **Tema**
   - Dark mode & light mode.
 
@@ -134,6 +142,7 @@ Diambil dari konfigurasi project saat ini:
 
 - `app/src/main/java/com/dewa/filemanager/ui/explorer/` → layar utama dual pane
 - `app/src/main/java/com/dewa/filemanager/ui/editor/` → text/code editor
+- `app/src/main/java/com/dewa/filemanager/ui/terminal/` → internal terminal shell + session tabs
 - `app/src/main/java/com/dewa/filemanager/ui/signaturekey/` → manajer keystore / signature key
 - `app/src/main/java/com/dewa/filemanager/ui/viewer/` → image/video/archive viewer
 - `app/src/main/java/com/dewa/filemanager/data/repository/` → operasi file & arsip
